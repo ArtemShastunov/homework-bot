@@ -42,6 +42,9 @@ def check_tokens():
     }
     for name, value in required_vars.items():
         if not value:
+            logging.critical(
+                f'Отсутствует переменная окружения: \'{name}\''
+            )
             raise MissingEnvVarError(
                 f'Отсутствует переменная окружения: \'{name}\''
             )
@@ -160,6 +163,5 @@ if __name__ == '__main__':
     )
     try:
         main()
-    except MissingEnvVarError as error:
-        logging.critical(error)
+    except MissingEnvVarError:
         sys.exit(1)
