@@ -40,14 +40,17 @@ def check_tokens():
         'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
         'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID
     }
+    missing_vars = []
+    error_template = 'Отсутствует переменная окружения: \'{}\''
+
     for name, value in required_vars.items():
         if not value:
-            logging.critical(
-                f'Отсутствует переменная окружения: \'{name}\''
-            )
-            raise MissingEnvVarError(
-                f'Отсутствует переменная окружения: \'{name}\''
-            )
+            error_msg = error_template.format(name)
+            logging.critical(error_msg)
+            missing_vars.append(error_msg)
+
+    if missing_vars:
+        raise MissingEnvVarError('; '.join(missing_vars))
 
 
 def send_message(bot, message):
@@ -57,8 +60,11 @@ def send_message(bot, message):
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.debug(f'Бот отправил сообщение "{message}"')
         return True
-    except (telebot.apihelper.ApiException, requests.RequestException):
-        logging.error('Сбой при отправке сообщения')
+    except (
+        telebot.apihelper.ApiException,
+        requests.RequestException
+    ) as error:
+        logging.error(f'Сбой при отправке сообщения: {error}')
         return False
 
 
@@ -70,9 +76,9 @@ def get_api_answer(timestamp):
         'params': {'from_date': timestamp}
     }
     logging.debug(
-        f'Запрос к API: {request_params["url"]}, '
-        f'headers: {request_params["headers"]}, '
-        f'params: {request_params["params"]}'
+        'Запрос к API: {url}, headers: {headers}, params: {params}'.format(
+            **request_params
+        )
     )
 
     try:
@@ -138,6 +144,7 @@ def main():
     check_tokens()
     bot = telebot.TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
+    last_error_message = None
     while True:
         try:
             response = get_api_answer(timestamp)
@@ -150,7 +157,9 @@ def main():
         except Exception as error:
             message = f'Сбой в программе: {error}'
             logging.error(message)
-            send_message(bot, message)
+            if message != last_error_message:
+                send_message(bot, message)
+                last_error_message = message
         finally:
             time.sleep(RETRY_PERIOD)
 
